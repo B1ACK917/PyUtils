@@ -56,17 +56,18 @@ def create_global_logger(log_level, log_file=None):
     cur_logger = logger
 
 
-def create_custom_logger(log_name, log_level, log_file=None):
+def create_custom_logger(log_name, log_level, stream=None, log_file=None):
     logger = logging.getLogger(log_name)
     logger.setLevel(log_level)
 
-    c_handler = logging.StreamHandler(stream=sys.stdout)
-    c_handler.setLevel(log_level)
+    if stream is not None:
+        c_handler = logging.StreamHandler(stream=stream)
+        c_handler.setLevel(log_level)
 
-    c_format = logging.Formatter("[%(asctime)s][%(name)s][%(levelname)s][%(message)s]")
-    c_handler.setFormatter(c_format)
+        c_format = logging.Formatter("[%(asctime)s][%(name)s][%(levelname)s][%(message)s]")
+        c_handler.setFormatter(c_format)
 
-    logger.addHandler(c_handler)
+        logger.addHandler(c_handler)
 
     if log_file is not None:
         check_file(log_file)
