@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from path import check_file
+from .path import check_file
 
 cur_logger = None
 INFO = logging.INFO
@@ -46,7 +46,7 @@ def create_global_logger(log_level, log_file=None):
     if log_file is not None:
         check_file(log_file)
         f_handler = logging.FileHandler(log_file)
-        f_handler.setLevel(logging.INFO)
+        f_handler.setLevel(logging.DEBUG)
         f_format = logging.Formatter(
             "[%(asctime)s][%(name)s][%(levelname)s][%(message)s]"
         )
@@ -71,7 +71,7 @@ def create_custom_logger(log_name, log_level, log_file=None):
     if log_file is not None:
         check_file(log_file)
         f_handler = logging.FileHandler(log_file)
-        f_handler.setLevel(logging.INFO)
+        f_handler.setLevel(logging.DEBUG)
         f_format = logging.Formatter(
             "[%(asctime)s][%(name)s][%(levelname)s][%(message)s]"
         )

@@ -21,10 +21,10 @@ def _python_exit():
 
 
 atexit.register(_python_exit)
-logger = create_custom_logger("ThreadPool Logger", logging.DEBUG, "log/threadpool.log")
+logger = create_custom_logger("ThreadPool Logger", logging.INFO, "log/threadpool.log")
 
 
-class _WorkItem:
+class ThreadWorker:
     def __init__(self, future, fn, args, kwargs):
         self.future = future
         self.fn = fn
@@ -35,6 +35,7 @@ class _WorkItem:
         if not self.future.set_running_or_notify_cancel():
             return
         try:
+            logger.debug("{} thread activate".format(self.fn.__name__))
             result = self.fn(*self.args, **self.kwargs)
         except BaseException as exc:
             logger.exception(f"---{self.fn.__name__}---{type(exc)} {exc} ")
@@ -47,19 +48,14 @@ class _WorkItem:
         return f"{(self.fn.__name__, self.args, self.kwargs)}"
 
 
-def set_thread_pool_executor_shrinkable(min_works, keep_alive_time):
-    ThreadPoolExecutorShrinkAble.MIN_WORKERS = min_works
-    ThreadPoolExecutorShrinkAble.KEEP_ALIVE_TIME = keep_alive_time
-
-
-class ThreadPoolExecutorShrinkAble(Executor):
+class DarkThreadPool(Executor):
     MIN_WORKERS = 1
     KEEP_ALIVE_TIME = 10
 
     def __init__(self, max_workers: int = None, thread_name_prefix=""):
         self._max_workers = max_workers or 4
         self._thread_name_prefix = thread_name_prefix
-        self.work_queue = self._work_queue = queue.Queue(max_workers or 10)
+        self._work_queue = queue.Queue(max_workers or 10)
         self._threads = weakref.WeakSet()
         self._lock_compute_threads_free_count = threading.Lock()
         self.threads_free_count = 0
@@ -75,8 +71,8 @@ class ThreadPoolExecutorShrinkAble(Executor):
             if self._shutdown:
                 raise RuntimeError("Pool already shutdown")
             f = Future()
-            w = _WorkItem(f, func, args, kwargs)
-            self.work_queue.put(w)
+            w = ThreadWorker(f, func, args, kwargs)
+            self._work_queue.put(w)
             self._adjust_thread_count()
             return f
 
@@ -84,7 +80,7 @@ class ThreadPoolExecutorShrinkAble(Executor):
         if (self.threads_free_count <= self.MIN_WORKERS) and (
             len(self._threads) < self._max_workers
         ):
-            t = _CustomThread(self).set_log_level(self.logger.level)
+            t = SingleThread(self)
             t.daemon = True
             t.start()
             self._threads.add(t)
@@ -93,16 +89,19 @@ class ThreadPoolExecutorShrinkAble(Executor):
     def shutdown(self, wait=True):
         with self._shutdown_lock:
             self._shutdown = True
-            self.work_queue.put(None)
+            self._work_queue.put(None)
         if wait:
             for t in self._threads:
                 t.join()
 
+    def get_work_queue(self):
+        return self._work_queue
 
-class _CustomThread(threading.Thread):
+
+class SingleThread(threading.Thread):
     _lock_for_judge_threads_free_count = threading.Lock()
 
-    def __init__(self, executorx: ThreadPoolExecutorShrinkAble):
+    def __init__(self, executorx: DarkThreadPool):
         super().__init__()
         self._executorx = executorx
 
@@ -115,7 +114,7 @@ class _CustomThread(threading.Thread):
         self._executorx._change_threads_free_count(1)
         while True:
             try:
-                work_item = self._executorx.work_queue.get(
+                work_item = self._executorx.get_work_queue().get(
                     block=True, timeout=self._executorx.KEEP_ALIVE_TIME
                 )
             except queue.Empty:
@@ -133,9 +132,14 @@ class _CustomThread(threading.Thread):
                 self._executorx._change_threads_free_count(1)
                 continue
             if _shutdown or self._executorx._shutdown:
-                self._executorx.work_queue.put(None)
+                self._executorx.get_work_queue().put(None)
                 break
 
 
 def get_current_threads_num():
     return threading.active_count()
+
+
+def set_thread_pool_executor_shrinkable(min_works, keep_alive_time):
+    DarkThreadPool.MIN_WORKERS = min_works
+    DarkThreadPool.KEEP_ALIVE_TIME = keep_alive_time
