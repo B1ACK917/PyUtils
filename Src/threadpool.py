@@ -21,7 +21,9 @@ def _python_exit():
 
 
 atexit.register(_python_exit)
-logger = create_custom_logger("ThreadPool Logger", logging.INFO, "log/threadpool.log")
+logger = create_custom_logger(
+    "ThreadPool Logger", logging.INFO, None, "log/threadpool.log"
+)
 
 
 class ThreadWorker:
