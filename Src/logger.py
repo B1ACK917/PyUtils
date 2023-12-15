@@ -32,7 +32,7 @@ def eprint(*args, **kwargs):
 
 def create_global_logger(log_level, log_file=None):
     global cur_logger
-    logger = logging.getLogger("Dark Logger")
+    logger = logging.getLogger("Shinomiya")
     logger.setLevel(log_level)
 
     c_handler = logging.StreamHandler(stream=sys.stdout)
@@ -82,5 +82,5 @@ def create_custom_logger(log_name, log_level, stream=None, log_file=None):
     return logger
 
 
-logger_file = "log/run.log"
+logger_file = "log/shinomiya.log"
 create_global_logger(DEBUG, logger_file)
